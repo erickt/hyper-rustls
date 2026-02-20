@@ -6,7 +6,7 @@ use std::{fmt, io};
 
 use http::Uri;
 use hyper::rt;
-use hyper_util::client::legacy::connect::Connection;
+use hyper_util::client::connect::Connection;
 use hyper_util::rt::TokioIo;
 use rustls::pki_types::ServerName;
 use tokio_rustls::TlsConnector;
@@ -219,6 +219,7 @@ pub trait ResolveServerName {
 
 #[cfg(all(
     test,
+    feature = "tokio-net",
     any(feature = "ring", feature = "aws-lc-rs"),
     any(
         feature = "rustls-native-certs",
@@ -230,7 +231,7 @@ mod tests {
     use std::future::poll_fn;
 
     use http::Uri;
-    use hyper_util::rt::TokioIo;
+    use hyper_util::{client::connect::TokioHttpConnector, rt::TokioIo};
     use tokio::net::TcpStream;
     use tower_service::Service;
 
@@ -290,7 +291,7 @@ mod tests {
             Allow::Any => builder.https_or_http(),
         }
         .enable_http1()
-        .build();
+        .build(TokioHttpConnector::new());
 
         poll_fn(|cx| service.poll_ready(cx)).await?;
         service

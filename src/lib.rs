@@ -11,7 +11,7 @@
 //! use http::StatusCode;
 //! use http_body_util::Empty;
 //! use hyper::body::Bytes;
-//! use hyper_util::client::legacy::Client;
+//! use hyper_util::client::{Client, connect::http::tokio::TokioHttpConnector};
 //! use hyper_util::rt::TokioExecutor;
 //!
 //! let mut rt = tokio::runtime::Runtime::new().unwrap();
@@ -21,7 +21,7 @@
 //!     .expect("no native root CA certificates found")
 //!     .https_only()
 //!     .enable_http1()
-//!     .build();
+//!     .build(TokioHttpConnector::new());
 //!
 //! let client: Client<_, Empty<Bytes>> = Client::builder(TokioExecutor::new()).build(https);
 //!

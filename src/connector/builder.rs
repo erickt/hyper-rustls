@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use hyper_util::client::legacy::connect::HttpConnector;
+use hyper_util::client::connect::http::HttpConnect;
+
 #[cfg(any(
     feature = "rustls-native-certs",
     feature = "rustls-platform-verifier",
@@ -30,12 +31,13 @@ use crate::config::ConfigBuilderExt;
 ///
 /// # #[cfg(all(feature = "webpki-roots", feature = "http1", feature="aws-lc-rs"))]
 /// # {
+/// # use hyper_util::client::legacy::connect::HttpConnector;
 /// # let _ = rustls::crypto::aws_lc_rs::default_provider().install_default();
 ///     let https = HttpsConnectorBuilder::new()
 ///     .with_webpki_roots()
 ///     .https_only()
 ///     .enable_http1()
-///     .build();
+///     .build(HttpConnector::new());
 /// # }
 /// ```
 pub struct ConnectorBuilder<State>(State);
@@ -236,8 +238,7 @@ impl WantsProtocols1 {
         }
     }
 
-    fn build(self) -> HttpsConnector<HttpConnector> {
-        let mut http = HttpConnector::new();
+    fn build<H: HttpConnect>(self, mut http: H) -> HttpsConnector<H> {
         // HttpConnector won't enforce scheme, but HttpsConnector will
         http.enforce_http(false);
         self.wrap_connector(http)
@@ -351,8 +352,8 @@ impl ConnectorBuilder<WantsProtocols2> {
     }
 
     /// This builds an [`HttpsConnector`] built on hyper's default [`HttpConnector`]
-    pub fn build(self) -> HttpsConnector<HttpConnector> {
-        self.0.inner.build()
+    pub fn build<H: HttpConnect>(self, http: H) -> HttpsConnector<H> {
+        self.0.inner.build(http)
     }
 
     /// This wraps an arbitrary low-level connector into an [`HttpsConnector`]
@@ -381,8 +382,8 @@ pub struct WantsProtocols3 {
 #[cfg(feature = "http2")]
 impl ConnectorBuilder<WantsProtocols3> {
     /// This builds an [`HttpsConnector`] built on hyper's default [`HttpConnector`]
-    pub fn build(self) -> HttpsConnector<HttpConnector> {
-        self.0.inner.build()
+    pub fn build<H: HttpConnect>(self, http: H) -> HttpsConnector<H> {
+        self.0.inner.build(http)
     }
 
     /// This wraps an arbitrary low-level connector into an [`HttpsConnector`]
@@ -394,8 +395,12 @@ impl ConnectorBuilder<WantsProtocols3> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "tokio-net"))]
 mod tests {
+    use crate::TokioSocketConnector;
+    use hyper_util::client::connect::http::HttpConnector;
+    use hyper_util::client::legacy::connect::dns::TokioGaiResolver;
+
     // Typical usage
     #[test]
     #[cfg(all(feature = "webpki-roots", feature = "http1"))]
@@ -405,7 +410,10 @@ mod tests {
             .with_webpki_roots()
             .https_only()
             .enable_http1()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
     }
 
     #[test]
@@ -422,7 +430,10 @@ mod tests {
             .with_tls_config(config_with_alpn)
             .https_only()
             .enable_http1()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
     }
 
     #[test]
@@ -437,7 +448,10 @@ mod tests {
             .with_tls_config(tls_config.clone())
             .https_only()
             .enable_http1()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert!(connector
             .tls_config
             .alpn_protocols
@@ -446,14 +460,20 @@ mod tests {
             .with_tls_config(tls_config.clone())
             .https_only()
             .enable_http2()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert_eq!(&connector.tls_config.alpn_protocols, &[b"h2".to_vec()]);
         let connector = super::ConnectorBuilder::new()
             .with_tls_config(tls_config.clone())
             .https_only()
             .enable_http1()
             .enable_http2()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert_eq!(
             &connector.tls_config.alpn_protocols,
             &[b"h2".to_vec(), b"http/1.1".to_vec()]
@@ -462,7 +482,10 @@ mod tests {
             .with_tls_config(tls_config)
             .https_only()
             .enable_all_versions()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert_eq!(
             &connector.tls_config.alpn_protocols,
             &[b"h2".to_vec(), b"http/1.1".to_vec()]
@@ -481,13 +504,19 @@ mod tests {
             .with_tls_config(tls_config.clone())
             .https_only()
             .enable_http2()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert_eq!(&connector.tls_config.alpn_protocols, &[b"h2".to_vec()]);
         let connector = super::ConnectorBuilder::new()
             .with_tls_config(tls_config)
             .https_only()
             .enable_all_versions()
-            .build();
+            .build(HttpConnector::new(
+                TokioGaiResolver::new(),
+                TokioSocketConnector::new(),
+            ));
         assert_eq!(&connector.tls_config.alpn_protocols, &[b"h2".to_vec()]);
     }
 

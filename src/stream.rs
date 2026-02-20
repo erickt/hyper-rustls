@@ -5,8 +5,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 
 use hyper::rt;
-use hyper_util::client::legacy::connect::{Connected, Connection};
-
+use hyper_util::client::connect::{Connected, Connection};
 use hyper_util::rt::TokioIo;
 use tokio_rustls::client::TlsStream;
 

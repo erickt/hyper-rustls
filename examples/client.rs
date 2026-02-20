@@ -6,7 +6,10 @@ use http::Uri;
 use http_body_util::{BodyExt, Empty};
 use hyper::body::Bytes;
 use hyper_rustls::ConfigBuilderExt;
-use hyper_util::{client::legacy::Client, rt::TokioExecutor};
+use hyper_util::{
+    client::{connect::http::TokioHttpConnector, Client},
+    rt::TokioExecutor,
+};
 use rustls::pki_types::pem::PemObject;
 use rustls::pki_types::CertificateDer;
 use rustls::RootCertStore;
@@ -68,7 +71,7 @@ async fn run_client() -> io::Result<()> {
         .with_tls_config(tls)
         .https_or_http()
         .enable_http1()
-        .build();
+        .build(TokioHttpConnector::new());
 
     // Build the hyper client from the HTTPS connector.
     let client: Client<_, Empty<Bytes>> = Client::builder(TokioExecutor::new()).build(https);
